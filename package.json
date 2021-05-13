@@ -5,7 +5,9 @@
   "author": "Giovanni Ferron <info@gvnn.it>",
   "license": "UNLICENSED",
   "scripts": {
-    "start": "run-s download build format",
+    "start": "run-s clean:build clean:properties download build format",
+    "clean:build": "rm -rf build",
+    "clean:properties": "rm -rf properties",
     "download": "ts-node download.ts",
     "build": "style-dictionary build",
     "format": "run-s lint:fix prettier",

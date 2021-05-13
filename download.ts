@@ -14,151 +14,6 @@ interface FigmaFileResponse {
   schemaVersion: 0;
 }
 
-// function getGrids(stylesArtboard) {
-//   // empty "grids obj" wheree we will store all colors
-//   const grids = {};
-//   // get "grids" artboard
-//   const gridsAtrboard = stylesArtboard.filter((item) => {
-//     return item.name === "grids";
-//   })[0].children;
-
-//   gridsAtrboard.map((item) => {
-//     const gridObj = {
-//       [item.name]: {
-//         count: {
-//           value: item.layoutGrids[0].count,
-//           type: "grids",
-//         },
-//         gutter: {
-//           value: `${item.layoutGrids[0].gutterSize}px`,
-//           type: "grids",
-//         },
-//         offset: {
-//           value: `${item.layoutGrids[0].offset}px`,
-//           type: "grids",
-//         },
-//         width: {
-//           value: `${item.absoluteBoundingBox.width}px`,
-//           type: "grids",
-//         },
-//       },
-//     };
-
-//     Object.assign(grids, gridObj);
-//   });
-
-//   return grids;
-// }
-
-// function getSpacers(stylesArtboard) {
-//   // empty "spacers obj" wheree we will store all colors
-//   const spacers = {};
-//   // get "spacers" artboard
-//   const spacersAtrboard = stylesArtboard.filter((item) => {
-//     return item.name === "spacers";
-//   })[0].children;
-
-//   spacersAtrboard.map((item) => {
-//     const spacerObj = {
-//       [item.name]: {
-//         value: `${item.absoluteBoundingBox.height}px`,
-//         type: "spacers",
-//       },
-//     };
-
-//     Object.assign(spacers, spacerObj);
-//   });
-
-//   return spacers;
-// }
-
-// function getFontStyles(stylesArtboard) {
-//   // empty "spacers obj" wheree we will store all colors
-//   const fontStyles = {};
-//   // get "spacers" artboard
-//   const fontStylesAtrboard = stylesArtboard.filter((item) => {
-//     return item.name === "typography";
-//   })[0].children;
-
-//   fontStylesAtrboard.map((fontItem, i) => {
-//     if (fontItem.children) {
-//       let subFonts = {};
-
-//       // get all sub fonts
-//       fontItem.children.map((subFontItem) => {
-//         let subFontObj = {
-//           [subFontItem.name]: {
-//             family: {
-//               value: `${subFontItem.style.fontFamily}`,
-//               type: "typography",
-//             },
-//             size: {
-//               value: `${subFontItem.style.fontSize}px`,
-//               type: "typography",
-//             },
-//             weight: {
-//               value: subFontItem.style.fontWeight,
-//               type: "typography",
-//             },
-//             lineheight: {
-//               value: `${subFontItem.style.lineHeightPercent}%`,
-//               type: "typography",
-//             },
-//             spacing: {
-//               value:
-//                 subFontItem.style.letterSpacing !== 0
-//                   ? `${subFontItem.style.letterSpacing}px`
-//                   : "normal",
-//               type: "typography",
-//             },
-//           },
-//         };
-//         // merge multiple subfonts objects into one
-//         Object.assign(subFonts, subFontObj);
-//       });
-
-//       //
-//       let fontObj = {
-//         [fontItem.name]: subFonts,
-//       };
-
-//       Object.assign(fontStyles, fontObj);
-//     } else {
-//       let fontObj = {
-//         [fontItem.name]: {
-//           family: {
-//             value: `${fontItem.style.fontFamily}, ${fontItem.style.fontPostScriptName}`,
-//             type: "typography",
-//           },
-//           size: {
-//             value: fontItem.style.fontSize,
-//             type: "typography",
-//           },
-//           weight: {
-//             value: fontItem.style.fontWeight,
-//             type: "typography",
-//           },
-//           lineheight: {
-//             value: `${fontItem.style.lineHeightPercent}%`,
-//             type: "typography",
-//           },
-//           spacing: {
-//             value:
-//               fontItem.style.letterSpacing !== 0
-//                 ? `${fontItem.style.letterSpacing}px`
-//                 : "normal",
-//             type: "typography",
-//           },
-//         },
-//       };
-
-//       Object.assign(fontStyles, fontObj);
-//     }
-//   });
-
-//   return fontStyles;
-// }
-
 const download = (figmaApiKey: string, figmaId: string) =>
   request<FigmaFileResponse>({
     url: `https://api.figma.com/v1/files/${figmaId}`,
@@ -208,8 +63,6 @@ const getGrids = (scenes: readonly SceneNode[]) => {
   const [gridFrame] = scenes.filter((item) => item.name === 'grids');
   const frameChildren = (gridFrame as FrameNode).children;
 
-  console.log(frameChildren);
-
   return frameChildren
     .filter((c): c is FrameNode => c.type === 'FRAME')
     .reduce(
@@ -241,18 +94,41 @@ const getGrids = (scenes: readonly SceneNode[]) => {
     );
 };
 
+const getSpacers = (scenes: readonly SceneNode[]) => {
+  const [gridFrame] = scenes.filter((item) => item.name === 'spacers');
+  const frameChildren = (gridFrame as FrameNode).children;
+
+  return frameChildren
+    .filter((c): c is ComponentNode => c.type === 'COMPONENT')
+    .reduce(
+      (previousValue, currentValue) => {
+        return {
+          spacers: {
+            ...previousValue.spacers,
+            [currentValue.name]: {
+              value: `${(currentValue as any).absoluteBoundingBox.height}px`,
+            },
+          },
+        };
+      },
+      {
+        spacers: {},
+      },
+    );
+};
+
 const generateTokens = async (figmaApiKey: string, figmaId: string) => {
   const downloadResult = await download(figmaApiKey, figmaId);
   const scenes = getScenes(downloadResult.data);
 
   const colors = getPalette(scenes);
   const grids = getGrids(scenes);
+  const spacers = getSpacers(scenes);
 
-  // Object.assign(baseTokeensJSON.token.spacers, getSpacers(stylesArtboard));
-  // Object.assign(baseTokeensJSON.token.fonts, getFontStyles(stylesArtboard));
-
+  await fs.mkdir('./properties', { recursive: true });
   await fs.writeJson('./properties/colors.json', colors);
   await fs.writeJson('./properties/grids.json', grids);
+  await fs.writeJson('./properties/spacers.json', spacers);
 };
 
 dotenv.config();
