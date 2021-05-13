@@ -14,8 +14,6 @@ interface FigmaFileResponse {
   schemaVersion: 0;
 }
 
-/// /////////////////////////////////////////////
-
 // function getGrids(stylesArtboard) {
 //   // empty "grids obj" wheree we will store all colors
 //   const grids = {};
@@ -190,22 +188,55 @@ const getPalette = (scenes: readonly SceneNode[]) => {
         const color = fill.color as RGBA;
         return {
           color: {
-            base: {
-              ...previousValue.color.base,
-              [currentValue.name]: {
-                value: `rgba(${rbaObj(color, 'r')}, ${rbaObj(
-                  color,
-                  'g',
-                )}, ${rbaObj(color, 'b')}, ${color.a})`,
+            ...previousValue.color,
+            [currentValue.name]: {
+              value: `rgba(${rbaObj(color, 'r')}, ${rbaObj(
+                color,
+                'g',
+              )}, ${rbaObj(color, 'b')}, ${color.a})`,
+            },
+          },
+        };
+      },
+      {
+        color: {},
+      },
+    );
+};
+
+const getGrids = (scenes: readonly SceneNode[]) => {
+  const [gridFrame] = scenes.filter((item) => item.name === 'grids');
+  const frameChildren = (gridFrame as FrameNode).children;
+
+  console.log(frameChildren);
+
+  return frameChildren
+    .filter((c): c is FrameNode => c.type === 'FRAME')
+    .reduce(
+      (previousValue, currentValue) => {
+        const layoutGrid = currentValue.layoutGrids[0] as RowsColsLayoutGrid;
+        return {
+          grid: {
+            ...previousValue.grid,
+            [currentValue.name]: {
+              count: {
+                value: layoutGrid.count,
+              },
+              gutter: {
+                value: `${layoutGrid.gutterSize}px`,
+              },
+              offset: {
+                value: `${layoutGrid.offset}px`,
+              },
+              width: {
+                value: `${(currentValue as any).absoluteBoundingBox.width}px`,
               },
             },
           },
         };
       },
       {
-        color: {
-          base: {},
-        },
+        grid: {},
       },
     );
 };
@@ -213,14 +244,15 @@ const getPalette = (scenes: readonly SceneNode[]) => {
 const generateTokens = async (figmaApiKey: string, figmaId: string) => {
   const downloadResult = await download(figmaApiKey, figmaId);
   const scenes = getScenes(downloadResult.data);
+
   const colors = getPalette(scenes);
+  const grids = getGrids(scenes);
 
-  // Object.assign(baseTokeensJSON.token.grids, getGrids(stylesArtboard));
   // Object.assign(baseTokeensJSON.token.spacers, getSpacers(stylesArtboard));
-
   // Object.assign(baseTokeensJSON.token.fonts, getFontStyles(stylesArtboard));
 
   await fs.writeJson('./properties/colors.json', colors);
+  await fs.writeJson('./properties/grids.json', grids);
 };
 
 dotenv.config();
